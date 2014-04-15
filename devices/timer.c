@@ -20,7 +20,9 @@
 /* Number of timer ticks since OS booted. */
 static int64_t ticks;
 
-static struct list sleep_list; // 1. create waiting_queue
+static struct list sleep_list; // 1. create waiting_queue.
+static bool compare_increasing_order (const struct list_elem* _a, const struct list_elem* _b, void *aux UNUSED); // Declear compare_increasing_order function.
+static void is_time_to_wakeup ();
 
 /* Number of loops per timer tick.
    Initialized by timer_calibrate(). */
@@ -38,7 +40,7 @@ static void real_time_delay (int64_t num, int32_t denom);
 void
 timer_init (void) 
 {
-  list_init (&sleep_list); // 2. initialize sleep_list
+  list_init (&sleep_list); // 2. initialize sleep_list.
   /* 8254 input frequency divided by TIMER_FREQ, rounded to
      nearest. */
   uint16_t count = (1193180 + TIMER_FREQ / 2) / TIMER_FREQ;
@@ -102,10 +104,37 @@ void
 timer_sleep (int64_t ticks) 
 {
   int64_t start = timer_ticks ();
+  struct thread   *tmp_thread      = thread_current (); // 3. wake up setting
+  enum intr_level  tmp_intr_status = intr_disable ();   //
+  tmp_thread->time_to_wakeup       = start + ticks;     //
+  list_insert_ordered (&sleep_list, &tmp_thread->elem, compare_increasing_order, NULL);
+  thread_block ();
+  intr_set_level (tmp_intr_status);
 
+  /*
   ASSERT (intr_get_level () == INTR_ON);
   while (timer_elapsed (start) < ticks) 
     thread_yield ();
+  */
+}
+
+// Compare function of two list_elems.
+static bool compare_increasing_order (const struct list_elem* _a, const struct list_elem* _b, void *aux UNUSED)
+{
+  const struct thread *t1 = list_entry (_a, struct thread, elem);
+  const struct thread *t2 = list_entry (_b, struct thread, elem);
+
+  if (t1->time_to_wakeup < t2->time_to_wakeup)
+    return true;
+  else if (t1->time_to_wakeup > t2->time_to_wakeup)
+    return false;
+  else if (t1->time_to_wakeup == t2->time_to_wakeup)
+  {
+    if (t1->priority > t2->priority)
+      return true;
+    else
+      return false;
+  }
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -183,9 +212,27 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
+  is_time_to_wakeup ();
   thread_tick ();
 }
 
+static void is_time_to_wakeup ()
+{
+  bool b_result;
+  struct thread* t;
+
+  while (!(b_result = list_empty (&sleep_list)))
+  {
+    t = list_entry (list_front (&sleep_list), struct thread, elem);
+
+    if (ticks >= t->time_to_wakeup)
+    {
+      list_pop_front (&sleep_list);
+      thread_unblock (t);
+    } else
+      break;
+  }
+}
 /* Returns true if LOOPS iterations waits for more than one timer
    tick, otherwise false. */
 static bool
