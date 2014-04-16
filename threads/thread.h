@@ -101,6 +101,7 @@ struct thread
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
     int64_t time_to_wakeup; // Wake up time.
+    int64_t time_slice;     // time slice.
   };
 
 /* If false (default), use round-robin scheduler.
