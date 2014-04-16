@@ -70,7 +70,7 @@ static void *alloc_frame (struct thread *, size_t size);
 static void schedule (void);
 void schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
-
+static bool high_priority (const struct list_elem*, const struct list_elem*, void *aux);
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This cannot work in
    general and it is possible in this case only because loader.S
@@ -135,8 +135,8 @@ thread_tick (void)
     kernel_ticks++;
 
   /* Enforce preemption. */
-  if (++thread_ticks >= TIME_SLICE)
-    intr_yield_on_return ();
+  // if (++thread_ticks >= TIME_SLICE)
+  //  intr_yield_on_return ();
 }
 
 /* Prints thread statistics. */
@@ -496,9 +496,20 @@ next_thread_to_run (void)
   if (list_empty (&ready_list))
     return idle_thread;
   else
+  {
+    list_sort (&ready_list, high_priority, NULL);
     return list_entry (list_pop_front (&ready_list), struct thread, elem);
+  }
 }
 
+static bool
+high_priority (const struct list_elem* _a, const struct list_elem* _b, void* aux UNUSED)
+{
+  const struct thread *a = list_entry(_a, struct thread, elem);
+  const struct thread *b = list_entry(_b, struct thread, elem);
+
+  return a->priority > b->priority;
+}
 /* Completes a thread switch by activating the new thread's page
    tables, and, if the previous thread is dying, destroying it.
 
