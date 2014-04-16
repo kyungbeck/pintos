@@ -28,7 +28,7 @@ test_alarm_priority (void)
     {
       int priority = PRI_DEFAULT - (i + 5) % 10 - 1;
       char name[16];
-      snprintf (name, sizeof name, "priority %d", priority);
+      snprintf (name, sizeof name, "A(priority %d)", priority);
       thread_create (name, priority, alarm_priority_thread, NULL);
     }
 
@@ -52,7 +52,7 @@ alarm_priority_thread (void *aux UNUSED)
   timer_sleep (wake_time - timer_ticks ());
 
   /* Prints a message on wake-up. */
-  msg ("Thread %s woke up.", thread_name ());
+  msg ("B(thread %s woke up.)", thread_name ());
 
   sema_up (&wait_sema);
 }
